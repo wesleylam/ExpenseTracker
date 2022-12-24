@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/index.css') }}">
+{% endblock %}
+
+
+{% block content %}
+{{ super() }}
+<h2 color="red">{{message}}</h2>
+<h3>Last 5 Records:</h3>
+<table class="table">
+
+  <tr>
+  {%for h in headers%}
+      <th>{{ h }}</th>
+  {%endfor%}
+  </tr>
+  
+  {%for record in lastRecords%}
+    <tr>
+      {%for v in record%}
+        <td>{{ v }}</td>
+      {%endfor%}
+      <td>
+        <form method="post">
+          <input name="action" type="hidden" value="DEL">
+          <input name="{{record[]}}" type="hidden" value="DEL">
+          <button type="submit">DEL</button>
+        </form>
+      </td>
+    </tr>
+  {%endfor%}
+</table>
+
+<br />
+<br />
+<br />
+<form method="post">
+  <input type="hidden" value="ADD">
+   <!-- reporter -->
+  <label for="payee">Payee</label>
+  <select name="payee">
+    {%for p in people%}
+      <option value="{{p}}">{{p}}</option>
+    {%endfor%}
+  </select>
+  <br/>
+  <!-- item -->
+  <label for="item">Item</label>
+  <input required type="text" name="item"/>
+  <br/>
+  <!-- currency -->
+  <label for="currency">Currency</label>
+  <select name="currency">
+    <option value="YEN">YEN</option>
+    <option value="HKD">HKD</option>
+    <option value="AUD">AUD</option>
+  </select>
+  <br/>
+  <!-- amount -->
+  <label for="amount">Amount</label>
+  <input required type="number" name="amount"/>
+  <br/>
+  <!-- target -->
+  <label for="target">Payer</label>
+  <select name="target">
+    <option value="shared">Shared</option>
+    {%for p in people%}
+      <option value="{{p}}">{{p}}</option>
+    {%endfor%}
+  </select>
+  <br/>
+  <!-- submit -->
+  <button type="submit">Add</button>
+</form>
+
+<br/>
+<h3>TOTAL PAYABLE:</h3>
+<table class="table">  
+  {%for k in payTable%}
+    <tr>
+      <td>{{ k }}</td>
+      <td>{{ payTable[k] }}</td>
+    </tr>
+  {%endfor%}
+</table>
+
+{% endblock %}
+
+{{ footer }}

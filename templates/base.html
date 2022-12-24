@@ -1,0 +1,24 @@
+{% extends "bootstrap/base.html" %}
+
+{% block styles %}
+{{ super() }}
+<script src="{{ url_for('static',filename='js/server.js') }}"></script>
+{% endblock %}
+
+
+{% block content %}
+{{ super() }}
+<nav class="navbar navbar-default">
+    <div class="container-fluid">
+      <div class="navbar-header">
+        <a class="navbar-brand" href="{{ url_for('index') }}">阿笠博士</a>
+      </div>
+      <ul class="nav navbar-nav">
+        <li class="active"><a href="#">Home</a></li>
+        {%for event in activeEvents %}
+          <li><a href="{{ url_for('showEvent', event = event) }}">{{ event }}</a></li>
+        {%endfor%}
+      </ul>
+    </div>
+</nav>
+{% endblock %}
