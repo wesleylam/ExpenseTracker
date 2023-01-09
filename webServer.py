@@ -39,7 +39,7 @@ def actionAdd(event, data):
     if csvData[0] == csvData[-1]: # payee == target
         message = "Error: Payee cannot be the same as target"
     # prevent resubmit
-    with open(join(getStorePath(), event), 'r') as f:
+    with open(join(getStorePath(), event + '.csv'), 'r') as f:
         for line in f.readlines():
             tokens = line.split(',')
             if (tokens[0:1] + tokens[2:]) == noDateData:
@@ -47,7 +47,7 @@ def actionAdd(event, data):
                 break
 
     if message == "":
-        with open(join(getStorePath(), event), 'a') as f:
+        with open(join(getStorePath(), event + '.csv'), 'a') as f:
             f.write('\n' + csvRow)
 
     return message
@@ -55,13 +55,13 @@ def actionAdd(event, data):
 def actionDel(event, data):
     message = ""
     wLines = ""
-    with open(join(getStorePath(), event), 'r') as f:
+    with open(join(getStorePath(), event + '.csv'), 'r') as f:
         for line in f.readlines():
             dataStr = data["toDel"]
             if line.strip() != dataStr:
                 wLines += line
 
-    with open(join(getStorePath(), event), 'w') as f:
+    with open(join(getStorePath(), event + '.csv'), 'w') as f:
         f.write(wLines)
 
     message = "Removed " + data["toDel"]
@@ -107,7 +107,7 @@ def parseStore(event):
     payers = None
     pay = {}
     lastRecords = []
-    with open(join(getStorePath(), event)) as f:
+    with open(join(getStorePath(), event + '.csv')) as f:
         for line in f.readlines():
             # skip lines
             if len(line) == 0 or (len(line) == 1 and line[0] == '\n') or line[0] == '#':
