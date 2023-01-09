@@ -3,42 +3,20 @@
 {% block styles %}
 {{ super() }}
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/index.css') }}">
+<script>
+  if ("{{message}}".startsWith("Error")) {
+    alert("{{message}}")
+  }
+</script>
 {% endblock %}
 
 
 {% block content %}
 {{ super() }}
 <h2 color="red">{{message}}</h2>
-<h3>Last 5 Records:</h3>
-<table class="table">
-
-  <tr>
-  {%for h in headers%}
-      <th>{{ h }}</th>
-  {%endfor%}
-  </tr>
-  
-  {%for record in lastRecords%}
-    <tr>
-      {%for v in record%}
-        <td>{{ v }}</td>
-      {%endfor%}
-      <td>
-        <form method="post">
-          <input name="action" type="hidden" value="DEL">
-          <input name="{{record[]}}" type="hidden" value="DEL">
-          <button type="submit">DEL</button>
-        </form>
-      </td>
-    </tr>
-  {%endfor%}
-</table>
-
 <br />
-<br />
-<br />
+<h3>Add new entry: </h3>
 <form method="post">
-  <input type="hidden" value="ADD">
    <!-- reporter -->
   <label for="payee">Payee</label>
   <select name="payee">
@@ -73,19 +51,59 @@
   </select>
   <br/>
   <!-- submit -->
+  <input name="action" type="hidden" value="ADD">
   <button type="submit">Add</button>
 </form>
 
 <br/>
-<h3>TOTAL PAYABLE:</h3>
+<h3>TOTAL PAYABLE: (YEN)</h3>
+{% for (payer, payee, amount) in payCondensed %}
+  {{ payer }} pay {{ payee }}: {{ amount }} <br/>
+{%endfor%}
+<br/>
 <table class="table">  
+  <tr>
+    <th>Payer \ Receiver</th>
+    {%for p in people%}
+      <th>{{p}}</th>
+    {%endfor%}
+  </tr>
   {%for k in payTable%}
     <tr>
       <td>{{ k }}</td>
-      <td>{{ payTable[k] }}</td>
+      {%for p in people%}
+        <th>{{ payTable[k][p] }}</th>
+      {%endfor%}
     </tr>
   {%endfor%}
 </table>
+<br />
+
+<h3>Last 100 Records:</h3>
+<table class="table">
+
+  <tr>
+  {%for h in headers%}
+      <th>{{ h }}</th>
+  {%endfor%}
+  </tr>
+  
+  {%for record in lastRecords%}
+    <tr>
+      {%for v in record%}
+        <td>{{ v }}</td>
+      {%endfor%}
+      <td>
+        <form method="post">
+          <input name="action" type="hidden" value="DEL">
+          <input value="{{','.join(record)}}" type="hidden" name="toDel">
+          <button type="submit">DEL</button>
+        </form>
+      </td>
+    </tr>
+  {%endfor%}
+</table>
+
 
 {% endblock %}
 

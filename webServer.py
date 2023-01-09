@@ -14,9 +14,22 @@ Bootstrap(app)
 
 # POST
 @app.post('/<event>')
-def addEntry(event):
+def modifyEntry(event):
     data = request.form
-    csvData = [v for k, v in data.items()]
+    action = data['action']
+
+    errMessage = ""
+    # ADD
+    if (action == "ADD"):  
+        errMessage = actionAdd(event, data)
+    elif (action == "DEL"):
+        errMessage = actionDel(event, data)
+        
+    return showEvent(event, errMessage)
+
+def actionAdd(event, data):
+    noDateData = [v.strip() for k, v in data.items() if k != "action"]
+    csvData = noDateData.copy()
     date = datetime.today().strftime('%Y-%m-%d')
     csvData.insert(1, date)
     csvRow = ",".join(csvData)
@@ -24,14 +37,36 @@ def addEntry(event):
     message = ""
     # validation
     if csvData[0] == csvData[-1]: # payee == target
-        message = "Payee cannot be the same as target"
+        message = "Error: Payee cannot be the same as target"
+    # prevent resubmit
+    with open(join(getStorePath(), event), 'r') as f:
+        for line in f.readlines():
+            tokens = line.split(',')
+            if (tokens[0:1] + tokens[2:]) == noDateData:
+                message = "Error: Duplicated entry, " + line[:-1]
+                break
 
     if message == "":
         with open(join(getStorePath(), event), 'a') as f:
             f.write('\n' + csvRow)
-        
-    return showEvent(event, message)
 
+    return message
+    
+def actionDel(event, data):
+    message = ""
+    wLines = ""
+    with open(join(getStorePath(), event), 'r') as f:
+        for line in f.readlines():
+            dataStr = data["toDel"]
+            if line.strip() != dataStr:
+                wLines += line
+
+    with open(join(getStorePath(), event), 'w') as f:
+        f.write(wLines)
+
+    message = "Removed " + data["toDel"]
+
+    return message 
 
 # GET
 @app.route('/<event>')
@@ -40,10 +75,22 @@ def showEvent(event, message = ""):
     if event not in activeEvents:
         return index()
 
+    # pay: k pay k2 > v amount
     pay, payers, lastRecords = parseStore(event)
 
-    return render_template('event.html', activeEvents = activeEvents, \
-        payTable = pay, people = payers, message = message, lastRecords = lastRecords, headers = getHeaders())
+    # build dynamic pay details
+    payCondensed = []
+    for i, payer in enumerate(payers[:-1]):
+        for payer2 in payers[i+1:]:
+            amount = round(abs(pay[payer][payer2] - pay[payer2][payer]), 2)
+            if pay[payer][payer2] > pay[payer2][payer]:
+                payCondensed.append( (payer,payer2,amount) )
+            else:
+                payCondensed.append( (payer2,payer,amount) )
+        
+
+    return render_template('event.html', activeEvents = activeEvents, showingEvent = event, \
+        payCondensed = payCondensed, payTable = pay, people = payers, message = message, lastRecords = lastRecords, headers = getHeaders())
 
 
 @app.route('/')
@@ -63,7 +110,7 @@ def parseStore(event):
     with open(join(getStorePath(), event)) as f:
         for line in f.readlines():
             # skip lines
-            if len(line) == 0 or line[0] == '#':
+            if len(line) == 0 or (len(line) == 1 and line[0] == '\n') or line[0] == '#':
                 continue
             
             tokens = line.split(',')
@@ -75,17 +122,18 @@ def parseStore(event):
                     raise Exception("No people in list")
                 paylistName = tokens[0]
                 payers = tokens[1:]
-                # init payers
-                pay = { payer: 0 for payer in payers }
+                # init payers (matrix)
+                pay = { payer: {payee: 0 for payee in payers} for payer in payers }
                 continue
 
-            lastRecords.append(tokens)
-            if len(lastRecords) == 6:
+            lastRecords.insert(0, tokens)
+            if len(lastRecords) == 100:
                 lastRecords.pop()
 
             reportor = tokens[0]
 
             rate = getRate("YEN")
+            payee = tokens[0]
             currency = tokens[-3]
             amount = float(tokens[-2])
             amount *= rate[currency]
@@ -93,9 +141,9 @@ def parseStore(event):
             if target.lower() == 'shared':
                 for k in pay.keys():
                     if k != reportor:
-                        pay[k] += amount / (len(payers) - 1)
+                        pay[k][payee] = round(pay[k][payee] + amount / (len(payers)), 2)
             else:
-                pay[target] += amount
+                pay[target][payee] = round(pay[target][payee] + amount, 2)
 
     return pay, payers, lastRecords
 
@@ -117,12 +165,15 @@ def getRate(toCurrency):
 
 def getSettingPath():
     return '/home/wesley/dev/ExpenseTracker/settings'
+
 def getStorePath():
     return '/home/wesley/dev/ExpenseTracker/store'
 
 def getActiveEvents():
     storePath = getStorePath()
-    return [f for f in listdir(storePath) if (isfile(join(storePath, f)) and '.csv' in f)]
+
+    # removed the .csv suffix
+    return [f[:-4] for f in listdir(storePath) if (isfile(join(storePath, f)) and '.csv' in f)]
 
 
 def runServer():

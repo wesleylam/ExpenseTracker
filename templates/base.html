@@ -3,6 +3,11 @@
 {% block styles %}
 {{ super() }}
 <script src="{{ url_for('static',filename='js/server.js') }}"></script>
+<script>
+  if ( window.history.replaceState ) {
+    window.history.replaceState( null, null, window.location.href );
+  }
+</script>
 {% endblock %}
 
 
@@ -14,9 +19,13 @@
         <a class="navbar-brand" href="{{ url_for('index') }}">阿笠博士</a>
       </div>
       <ul class="nav navbar-nav">
-        <li class="active"><a href="#">Home</a></li>
+        <li><a href="{{ url_for('index') }}">Home</a></li>
         {%for event in activeEvents %}
-          <li><a href="{{ url_for('showEvent', event = event) }}">{{ event }}</a></li>
+          <li class="
+          {%if event == showingEvent %}
+          active
+          {%endif%}
+          "><a href="{{ url_for('showEvent', event = event) }}">{{ event }}</a></li>
         {%endfor%}
       </ul>
     </div>
