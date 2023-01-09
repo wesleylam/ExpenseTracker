@@ -1,7 +1,0 @@
-# name, people ...
-Jp Trip,Hayes,Wesley,Marcus
-# reportor, date, item, currency, amount, target
-Hayes,2022-12-25,test,YEN,123,shared
-Hayes,2022-12-25,123,YEN,1234,shared
-Wesley,2022-12-25,test2,AUD,999,shared
-Wesley,2022-12-25,Dkof,HKD,1000000,Hayes
