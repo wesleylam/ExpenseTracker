@@ -10,7 +10,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 Bootstrap(app)
-
+allCurrency = ['AUD', 'YEN', 'HKD']
 
 # POST
 @app.post('/<event>')
@@ -72,6 +72,7 @@ def actionDel(event, data):
 @app.route('/<event>')
 def showEvent(event, message = ""):
     activeEvents = getActiveEvents()
+    
     if event not in activeEvents:
         return index()
 
@@ -88,8 +89,7 @@ def showEvent(event, message = ""):
             else:
                 payCondensed.append( (payer2,payer,amount) )
         
-
-    return render_template('event.html', activeEvents = activeEvents, showingEvent = event, \
+    return render_template('event.html', activeEvents = activeEvents, showingEvent = event, currencies = getFullRates(), \
         payCondensed = payCondensed, payTable = pay, people = payers, message = message, lastRecords = lastRecords, headers = getHeaders())
 
 
@@ -132,11 +132,11 @@ def parseStore(event):
 
             reportor = tokens[0]
 
-            rate = getRate("YEN")
+            rates = getFullRates()
             payee = tokens[0]
             currency = tokens[-3]
             amount = float(tokens[-2])
-            amount *= rate[currency]
+            amount *= rates[currency]['YEN']
             target = tokens[-1]
             if target.lower() == 'shared':
                 for k in pay.keys():
@@ -147,7 +147,31 @@ def parseStore(event):
 
     return pay, payers, lastRecords
 
-def getRate(toCurrency):
+def getFullRates():
+    rates = {}
+    for c in allCurrency:
+        rates[c] = getRate(c)
+
+    for fromC, rate in rates.items():
+        for toC in allCurrency:
+            if toC != fromC and toC not in rate:
+                rates[fromC][toC] = deriveRate(fromC, toC, rates)
+
+    return rates
+
+def deriveRate(fromC, toC, rates):
+    if toC in rates[fromC]:
+        return rates[fromC][toC]
+
+    fromRate = rates[fromC]
+    for midToC, midToRate in fromRate.items():
+        if midToC != fromC:
+            return midToRate * deriveRate(midToC, toC, rates)
+
+    raise Exception(f"cannot derive rate, {fromC} -> {toC}")
+
+
+def getRate(fromCurrency):
     rate = {}
     with open(join(getSettingPath(), 'rates.csv')) as f:
         for line in f.readlines():
@@ -157,10 +181,12 @@ def getRate(toCurrency):
             
             tokens = line.split(',')
             assert len(tokens) == 3, "Incorrect format in rates setting files: " + len(tokens)
-            if tokens[1] == toCurrency:
-                rate[tokens[0]] = float(tokens[2])
-    if toCurrency not in rate:
-        rate[toCurrency] = 1
+            if tokens[0] == fromCurrency:
+                rate[tokens[1]] = float(tokens[2])
+            elif tokens[1] == fromCurrency:
+                rate[tokens[0]] = 1.0 / float(tokens[2])
+    if fromCurrency not in rate:
+        rate[fromCurrency] = 1
     return rate
 
 def getSettingPath():

@@ -7,6 +7,20 @@
   if ("{{message}}".startsWith("Error")) {
     alert("{{message}}")
   }
+
+  yenRate = {
+    {% for (toC, rate) in currencies['YEN'].items() %}
+    {{toC}}:{{rate}},
+    {%endfor%}
+  }
+
+  function rateOnChange(event) {
+    toC = event.value
+    rate = yenRate[toC]
+    for (let strong of document.getElementsByName("switchableCurrency")) {
+      strong.innerHTML = (parseFloat(strong.attributes['value'].value) * rate).toFixed(2);
+    }
+  }
 </script>
 {% endblock %}
 
@@ -56,9 +70,18 @@
 </form>
 
 <br/>
-<h3>TOTAL PAYABLE: (YEN)</h3>
+
+<h3>TOTAL PAYABLE: </h3>
+<!-- currency -->
+<label for="currency">Currency</label>
+<select id="display_currency_switch" name="currency" onchange="rateOnChange(this)">
+{% for (c, rate) in currencies.items() %}
+<option value="{{c}}">{{c}}</option>
+{%endfor%}
+</select>
+<br/>
 {% for (payer, payee, amount) in payCondensed %}
-  {{ payer }} pay {{ payee }}: {{ amount }} <br/>
+  {{ payer }} pay {{ payee }}: <strong name="switchableCurrency" value="{{amount}}">{{ amount }}</strong> <br/>
 {%endfor%}
 <br/>
 <table class="table">  
@@ -72,7 +95,9 @@
     <tr>
       <td>{{ k }}</td>
       {%for p in people%}
-        <th>{{ payTable[k][p] }}</th>
+        <th>
+          <strong name="switchableCurrency" value="{{payTable[k][p]}}">{{ payTable[k][p] }}</strong>
+        </th>
       {%endfor%}
     </tr>
   {%endfor%}
@@ -104,7 +129,8 @@
   {%endfor%}
 </table>
 
-
+<script>
+  rateOnChange(document.getElementById("display_currency_switch"))
+</script>
 {% endblock %}
-
 {{ footer }}
