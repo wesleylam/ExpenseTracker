@@ -32,38 +32,65 @@
 <h3>Add new entry: </h3>
 <form method="post">
    <!-- reporter -->
-  <label for="payee">Payee</label>
-  <select name="payee">
-    {%for p in people%}
-      <option value="{{p}}">{{p}}</option>
-    {%endfor%}
-  </select>
-  <br/>
-  <!-- item -->
-  <label for="item">Item</label>
-  <input required type="text" name="item"/>
-  <br/>
-  <!-- currency -->
-  <label for="currency">Currency</label>
-  <select name="currency">
-    <option value="YEN">YEN</option>
-    <option value="HKD">HKD</option>
-    <option value="AUD">AUD</option>
-  </select>
-  <br/>
-  <!-- amount -->
-  <label for="amount">Amount</label>
-  <input required type="number" name="amount"/>
-  <br/>
-  <!-- target -->
-  <label for="target">Payer</label>
-  <select name="target">
-    <option value="shared">Shared</option>
-    {%for p in people%}
-      <option value="{{p}}">{{p}}</option>
-    {%endfor%}
-  </select>
-  <br/>
+   <table class="table-condensed">
+    <tr>
+      <td>
+        <label for="payee">Who paid</label>
+      </td>
+      <td>
+        <select name="payee">
+          {%for p in people%}
+            <option value="{{p}}">{{p}}</option>
+          {%endfor%}
+        </select>
+      </td>
+    </tr>
+    <!-- item -->
+    <tr>
+      <td>
+        <label for="item">Description</label>
+      </td>
+      <td>
+        <input required type="text" name="item"/>
+      </td>
+    </tr>
+    <!-- currency -->
+    <tr>
+      <td>
+        <label for="currency">Currency</label>
+      </td>
+      <td>
+        <select name="currency">
+          {% for (c, rate) in currencies.items() %}
+          <option value="{{c}}">{{c}}</option>
+          {%endfor%}
+        </select>
+      </td>
+    </tr>
+    <!-- amount -->
+    <tr>
+      <td>
+        <label for="amount">Amount</label>
+      </td>
+      <td>
+        <input required type="number" name="amount"/>
+      </td>
+    </tr>
+    <!-- target -->
+    <tr>
+      <td>
+        <label for="target">Who should pay back</label>
+      </td>
+      <td>
+        <select name="target">
+          <option value="shared">Shared</option>
+          {%for p in people%}
+            <option value="{{p}}">{{p}}</option>
+          {%endfor%}
+        </select>
+      </td>
+    </tr>
+   </table>
   <!-- submit -->
   <input name="action" type="hidden" value="ADD">
   <button type="submit">Add</button>
@@ -75,16 +102,16 @@
 <!-- currency -->
 <label for="currency">Currency</label>
 <select id="display_currency_switch" name="currency" onchange="rateOnChange(this)">
-{% for (c, rate) in currencies.items() %}
-<option value="{{c}}">{{c}}</option>
-{%endfor%}
+  {% for (c, rate) in currencies.items() %}
+  <option value="{{c}}">{{c}}</option>
+  {%endfor%}
 </select>
 <br/>
 {% for (payer, payee, amount) in payCondensed %}
   {{ payer }} pay {{ payee }}: <strong name="switchableCurrency" value="{{amount}}">{{ amount }}</strong> <br/>
 {%endfor%}
 <br/>
-<table class="table">  
+<table class="table table-hover">  
   <tr>
     <th>Payer \ Receiver</th>
     {%for p in people%}
@@ -105,8 +132,7 @@
 <br />
 
 <h3>Last 100 Records:</h3>
-<table class="table">
-
+<table class="table table-striped">
   <tr>
   {%for h in headers%}
       <th>{{ h }}</th>
