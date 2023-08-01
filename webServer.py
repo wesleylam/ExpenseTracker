@@ -1,12 +1,12 @@
 # from DJDynamoDB import DJDB
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 from flask_bootstrap import Bootstrap
-import random
-import asyncio
 from waitress import serve
-from os import listdir
-from os.path import isfile, join
+from os import listdir, mkdir, remove
+from os.path import isfile, join, isdir, exists
 from datetime import datetime
+import pandas as pd
+import time
 
 app = Flask(__name__)
 Bootstrap(app)
@@ -21,17 +21,16 @@ def modifyEntry(event):
     errMessage = ""
     # ADD
     if (action == "ADD"):  
-        errMessage = actionAdd(event, data)
+        errMessage = actionAdd(event, request)
     elif (action == "DEL"):
         errMessage = actionDel(event, data)
         
     return showEvent(event, errMessage)
 
-def actionAdd(event, data):
-    noDateData = [v.strip() for k, v in data.items() if k != "action"]
-    csvData = noDateData.copy()
-    date = datetime.today().strftime('%Y-%m-%d')
-    csvData.insert(1, date)
+def actionAdd(event, request):
+    data = request.form
+    dataList = [v.strip() for k, v in data.items() if k != "action"]
+    csvData = dataList.copy()
     csvRow = ",".join(csvData)
 
     message = ""
@@ -39,32 +38,49 @@ def actionAdd(event, data):
     if csvData[0] == csvData[-1]: # payee == target
         message = "Error: Payee cannot be the same as target"
     # prevent resubmit
-    with open(join(getStorePath(), event + '.csv'), 'r') as f:
-        for line in f.readlines():
-            tokens = line.split(',')
-            if (tokens[0:1] + tokens[2:]) == noDateData:
-                message = "Error: Duplicated entry, " + line[:-1]
-                break
+    fname = join(getStorePath(), event + '.csv')
+    
+    df = pd.read_csv(fname, index_col=0, na_filter=False, dtype=str)
 
+    ms = int(time.time())
+    rowSeries = pd.Series(data)
+    # save attachment
+    f = request.files['attachment']
+    if f.filename != "":
+        eventAStorePath = join(getAttachmentStorePath(), event)
+        if not isdir(eventAStorePath):
+            mkdir(eventAStorePath)
+        newFilename = str(ms) + "." + f.filename.split(".")[-1]
+        f.save(join(eventAStorePath, newFilename))
+        rowSeries["attachment"] = newFilename
+    else:
+        rowSeries["attachment"] = ""
+        
+    rowSeries.name = ms
+    df.at[ms] = rowSeries
+    if (df.duplicated().any()):
+        message = "Error: Duplicated entry, " + csvRow
+    
     if message == "":
-        with open(join(getStorePath(), event + '.csv'), 'a') as f:
-            f.write('\n' + csvRow)
+        df.to_csv(fname)
 
     return message
     
 def actionDel(event, data):
     message = ""
-    wLines = ""
-    with open(join(getStorePath(), event + '.csv'), 'r') as f:
-        for line in f.readlines():
-            dataStr = data["toDel"]
-            if line.strip() != dataStr:
-                wLines += line
-
-    with open(join(getStorePath(), event + '.csv'), 'w') as f:
-        f.write(wLines)
-
-    message = "Removed " + data["toDel"]
+    fname = join(getStorePath(), event + '.csv')
+    df = pd.read_csv(fname, index_col=0, dtype=str, keep_default_na=False)
+    
+    row = df.loc[int(data["hash"])]
+    if row["attachment"] != "":
+        aPath = join(getAttachmentStorePath(), event, row["attachment"])
+        if exists(aPath):
+            remove(aPath)
+    
+    df = df.drop(int(data["hash"]), axis=0)
+    df.to_csv(fname)
+    
+    message = "Removed " + data["hash"]
 
     return message 
 
@@ -90,7 +106,8 @@ def showEvent(event, message = ""):
                 payCondensed.append( (payer2,payer,amount) )
         
     return render_template('event.html', activeEvents = activeEvents, showingEvent = event, currencies = getFullRates(), \
-        payCondensed = payCondensed, payTable = pay, people = payers, message = message, lastRecords = lastRecords, headers = getHeaders())
+        payCondensed = payCondensed, payTable = pay, people = payers, message = message, lastRecords = lastRecords, 
+        today = datetime.today().strftime('%Y-%m-%d'), headers = getHeaders())
 
 
 @app.route('/')
@@ -100,50 +117,47 @@ def index():
                            activeEvents = activeEvents)
 
 def getHeaders():
-    return ["Payee", "Date", "Description", "Currency", "Amount", "Payer"]
+    return ["Reportor", "Date", "Description", "Currency", "Amount", "Payer", "Attachment", "Hash"]
 
 def parseStore(event):
-    paylistName = None
     payers = None
     pay = {}
     lastRecords = []
-    with open(join(getStorePath(), event + '.csv')) as f:
-        for line in f.readlines():
-            # skip lines
-            if len(line) == 0 or (len(line) == 1 and line[0] == '\n') or line[0] == '#':
-                continue
-            
-            tokens = line.split(',')
-            tokens = [token.strip() for token in tokens]
+    
+    fname = join(getStorePath(), event + '.csv')
+    df = pd.read_csv(fname, index_col=0, keep_default_na=False)
+    
+    # GET FILE INFO
+    info = readInfo()
+    if event not in info:
+        raise Exception("No event " + event)
+    
+    if len(info[event]) == 0:
+        raise Exception("No people in list")
+    payers = info[event]
+    pay = { payer: {payee: 0 for payee in payers} for payer in payers }
+    
+    # GET RATES
+    rates = getFullRates()
 
-            # first non-commented line
-            if paylistName == None:
-                if len(tokens) == 1:
-                    raise Exception("No people in list")
-                paylistName = tokens[0]
-                payers = tokens[1:]
-                # init payers (matrix)
-                pay = { payer: {payee: 0 for payee in payers} for payer in payers }
-                continue
+    # ITERATE RECORDS
+    for i, row in df.iterrows():
+        lastRecords.insert(0, row)
+        if len(lastRecords) == 100:
+            lastRecords.pop()
 
-            lastRecords.insert(0, tokens)
-            if len(lastRecords) == 100:
-                lastRecords.pop()
-
-            reportor = tokens[0]
-
-            rates = getFullRates()
-            payee = tokens[0]
-            currency = tokens[-3]
-            amount = float(tokens[-2])
-            amount *= rates[currency]['YEN']
-            target = tokens[-1]
-            if target.lower() == 'shared':
-                for k in pay.keys():
-                    if k != reportor:
-                        pay[k][payee] = round(pay[k][payee] + amount / (len(payers)), 2)
-            else:
-                pay[target][payee] = round(pay[target][payee] + amount, 2)
+        payee = row['reportor']
+        currency = row['currency']
+        amount = row['amount']
+        amount *= rates[currency]['YEN']
+        target = row['target']
+        
+        if target.lower() == 'shared':
+            for k in pay.keys():
+                if k != payee:
+                    pay[k][payee] = round(pay[k][payee] + amount / (len(payers)), 2)
+        else:
+            pay[target][payee] = round(pay[target][payee] + amount, 2)
 
     return pay, payers, lastRecords
 
@@ -195,6 +209,9 @@ def getSettingPath():
 def getStorePath():
     return '/home/wesley/dev/ExpenseTracker/store'
 
+def getAttachmentStorePath():
+    return '/home/wesley/dev/ExpenseTracker/static/attachments'
+
 def getActiveEvents():
     storePath = getStorePath()
 
@@ -202,9 +219,18 @@ def getActiveEvents():
     return [f[:-4] for f in listdir(storePath) if (isfile(join(storePath, f)) and '.csv' in f)]
 
 
+def readInfo():
+    info = {}
+    with open(join(getStorePath(), 'info.txt')) as f:
+        for line in f.readlines():
+            tokens = line.split(',')
+            info[tokens[0]] = [t.strip() for t in tokens[1:]]
+            
+    return info
+
 def runServer():
     hostName = "0.0.0.0"
-    serverPort = 8080
+    serverPort = 80
     serve(app, host=hostName, port=serverPort)
     # app.run(debug = False, host = hostName, port = serverPort )
 

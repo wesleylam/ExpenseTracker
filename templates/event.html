@@ -30,19 +30,28 @@
 <h2 color="red">{{message}}</h2>
 <br />
 <h3>Add new entry: </h3>
-<form method="post">
+<form method="post" enctype = "multipart/form-data">
    <!-- reporter -->
    <table class="table-condensed">
     <tr>
       <td>
-        <label for="payee">Who paid</label>
+        <label for="reportor">Who paid</label>
       </td>
       <td>
-        <select name="payee">
+        <select name="reportor">
           {%for p in people%}
             <option value="{{p}}">{{p}}</option>
           {%endfor%}
         </select>
+      </td>
+    </tr>
+    <!-- date -->
+    <tr>
+      <td>
+        <label for="date">Date</label>
+      </td>
+      <td>
+        <input required type="date" name="date" value="{{today}}"/>
       </td>
     </tr>
     <!-- item -->
@@ -73,7 +82,7 @@
         <label for="amount">Amount</label>
       </td>
       <td>
-        <input required type="number" name="amount"/>
+        <input required type="number" step="0.01" name="amount"/>
       </td>
     </tr>
     <!-- target -->
@@ -88,6 +97,15 @@
             <option value="{{p}}">{{p}}</option>
           {%endfor%}
         </select>
+      </td>
+    </tr>
+    <!-- File -->
+    <tr>
+      <td>
+        <label for="attachment">Image (optional)</label>
+      </td>
+      <td>
+        <input type="file" name="attachment"/>
       </td>
     </tr>
    </table>
@@ -138,16 +156,20 @@
       <th>{{ h }}</th>
   {%endfor%}
   </tr>
-  
+
   {%for record in lastRecords%}
     <tr>
-      {%for v in record%}
-        <td>{{ v }}</td>
+      {%for k, v in record.to_dict().items()%}
+        {%if k == "attachment" %}
+            <td><img style="max-width:300px" src="{{ url_for('static', filename='attachments/' + showingEvent + '/' + v) }}" class="image" /></td>
+        {% else %}
+            <td>{{ v }}</td>
+        {%endif%}
       {%endfor%}
       <td>
         <form method="post">
           <input name="action" type="hidden" value="DEL">
-          <input value="{{','.join(record)}}" type="hidden" name="toDel">
+          <input value="{{record.name}}" type="hidden" name="hash">
           <button type="submit">DEL</button>
         </form>
       </td>
