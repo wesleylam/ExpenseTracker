@@ -7,6 +7,7 @@ from os.path import isfile, join, isdir, exists
 from datetime import datetime
 import pandas as pd
 import time
+import itertools
 
 app = Flask(__name__)
 Bootstrap(app)
@@ -105,8 +106,11 @@ def showEvent(event, message = ""):
             else:
                 payCondensed.append( (payer2,payer,amount) )
         
-    return render_template('event.html', activeEvents = activeEvents, showingEvent = event, currencies = getFullRates(), \
-        payCondensed = payCondensed, payTable = pay, people = payers, message = message, lastRecords = lastRecords, 
+    return render_template(
+        'event.html', activeEvents = activeEvents, showingEvent = event, 
+        currencies = getFullRates(), payCondensed = payCondensed, payTable = pay, people = payers, 
+        share_option = [f"Shared: {x}, {y}" for x, y in itertools.combinations(payers, 2)], 
+        message = message, lastRecords = lastRecords, 
         today = datetime.today().strftime('%Y-%m-%d'), headers = getHeaders())
 
 
@@ -117,7 +121,10 @@ def index():
                            activeEvents = activeEvents)
 
 def getHeaders():
-    return ["Reportor", "Date", "Description", "Currency", "Amount", "Payer", "Attachment", "Hash"]
+    return {k: v for k, v in zip(
+        ["reportor","date", "item", "currency", "amount", "target","attachment", "hash"],
+        ["Reportor", "Date", "Description", "Currency", "Amount", "Payer", "Attachment", "Hash"]
+    )}
 
 def parseStore(event):
     payers = None
@@ -150,12 +157,22 @@ def parseStore(event):
         currency = row['currency']
         amount = row['amount']
         amount *= rates[currency]['YEN']
-        target = row['target']
+        target: str = row['target']
         
+        comb_shared_prefix = "Shared: "
+        # Shared ALL
         if target.lower() == 'shared':
             for k in pay.keys():
                 if k != payee:
                     pay[k][payee] = round(pay[k][payee] + amount / (len(payers)), 2)
+        # shared (NOT ALL)
+        elif target.startswith(comb_shared_prefix):
+            shared_payers = target.split(comb_shared_prefix)[1].split(", ")
+            splitted_amount = round(amount / (len(shared_payers)), 2)
+            for payer in shared_payers:
+                if payer != payee:
+                    pay[payer][payee] += splitted_amount
+        # individual
         else:
             pay[target][payee] = round(pay[target][payee] + amount, 2)
 
