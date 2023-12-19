@@ -173,7 +173,7 @@
       {%for k, display_h in headers.items() %}
         {%if k in record %}
           <td class="searchable_{{display_h}}">
-            {%if k == "attachment" %}
+            {%if k == "attachment" and record[k] != "" %}
               <img 
                 style="max-width:300px" 
                 src="{{ url_for('static', filename='attachments/' + showingEvent + '/' + record[k]) }}" 

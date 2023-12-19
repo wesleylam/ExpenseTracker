@@ -111,7 +111,7 @@ def showEvent(event, message = ""):
         
     return render_template(
         'event.html', activeEvents = activeEvents, showingEvent = event, 
-        currencies = getFullRates(), payCondensed = payCondensed, payTable = pay, people = payers, 
+        currencies = getFullRates(event), payCondensed = payCondensed, payTable = pay, people = payers, 
         share_option = [f"Shared: {x}, {y}" for x, y in itertools.combinations(payers, 2)], 
         message = message, lastRecords = lastRecords, 
         today = datetime.today().strftime('%Y-%m-%d'), headers = getHeaders())

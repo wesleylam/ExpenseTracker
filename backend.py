@@ -25,7 +25,7 @@ def parseStore(event):
     df = pd.read_csv(fname, index_col=0, keep_default_na=False)
     
     # GET FILE INFO
-    info = readInfo()
+    info, preferredCurrency = readInfo()
     if event not in info:
         raise Exception("No event " + event)
     
@@ -68,8 +68,17 @@ def parseStore(event):
 
     return pay, payers, lastRecords
 
-def getFullRates():
+def getFullRates(event = None):
     rates = {}
+
+    if event is not None:
+        info, preferredCurrency = readInfo()
+        if event in preferredCurrency:
+            pc = preferredCurrency[event]
+            if pc in allCurrency:
+                # add preferred first
+                rates[pc] = 1
+
     for c in allCurrency:
         rates[c] = getRate(c)
 
@@ -101,6 +110,8 @@ def getRate(fromCurrency):
                 continue
             
             tokens = line.split(',')
+            # clean input
+            tokens = [t.strip() for t in tokens]
             assert len(tokens) == 3, "Incorrect format in rates setting files: " + len(tokens)
             if tokens[0] == fromCurrency:
                 rate[tokens[1]] = float(tokens[2])
@@ -128,9 +139,15 @@ def getActiveEvents():
 
 def readInfo():
     info = {}
+    preferredCurrency = {}
     with open(join(getStorePath(), 'info.txt')) as f:
         for line in f.readlines():
             tokens = line.split(',')
-            info[tokens[0]] = [t.strip() for t in tokens[1:]]
+            info[tokens[0]] = [t.strip() for t in tokens[2:]]
+
+            pc = tokens[1].strip()
+            preferredCurrency[tokens[0]] = pc
+            if pc not in allCurrency:
+                raise Exception("Invalid currency: " + pc)
             
-    return info
+    return info, preferredCurrency
