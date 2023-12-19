@@ -8,41 +8,13 @@
     alert("{{message}}")
   }
 
-  yenRate = {
+  const yenRate = {
     {% for (toC, rate) in currencies['YEN'].items() %}
     {{toC}}:{{rate}},
     {%endfor%}
   }
-
-  function rateOnChange(event) {
-    toC = event.value
-    rate = yenRate[toC]
-    for (let strong of document.getElementsByName("switchableCurrency")) {
-      strong.innerHTML = (parseFloat(strong.attributes['value'].value) * rate).toFixed(2);
-    }
-  }
-
-  function table_search(input) {
-    table = document.getElementById("last_100_records_table");
-    filter = input.value.toLowerCase();
-    tr = table.getElementsByTagName("tr");
-    input_id = input.id.split("_")[0]
-
-    // Loop through all table rows, and hide those who don't match the search query
-    for (i = 0; i < tr.length; i++) {
-      td = tr[i].getElementsByClassName("searchable_" + input_id)[0];
-      if (td) {
-        txtValue = td.textContent || td.innerText;
-
-        if (txtValue.toLowerCase().includes(filter)) {
-          tr[i].style.display = "";
-        } else {
-          tr[i].style.display = "none";
-        }
-      }
-    }
-  }
 </script>
+<script src="{{url_for('static', filename='js/event.js')}}"></script>
 {% endblock %}
 
 
@@ -97,13 +69,26 @@
         </select>
       </td>
     </tr>
+    <!-- calculator -->
+    <tr>
+      <td>
+        <label for="calculator">Calculator</label>
+      </td>
+      <td>
+        <input id="calc_eval_input" type="text" name="calculator"
+               onkeyup="calculator_eval(this)" 
+               placeholder="Enter calculation" />
+      </td>
+    </tr>
     <!-- amount -->
     <tr>
       <td>
-        <label for="amount">Amount</label>
+        <label id="new_amount_label" for="amount">Amount</label>
       </td>
       <td>
-        <input required type="number" step="0.01" name="amount"/>
+        <input required id="new_amount_input" type="number" 
+              onkeyup="amount_input_edited()"
+              step="0.01" name="amount"/>
       </td>
     </tr>
     <!-- target -->
@@ -173,26 +158,32 @@
 <h3>Last 100 Records:</h3>
 <table id="last_100_records_table" class="table table-striped">
   <tr>
-  {%for k, h in headers.items()%}
-      <th>
-        {{ h }}
-        <input type="text" id="{{h}}_search_input" 
+  {%for k, display_h in headers.items()%}
+      <th id="record_table_{{display_h}}_header_th">
+        {{display_h}}
+        <input type="text" id="{{display_h}}_search_input" 
                 onkeyup="table_search(this)" 
-                placeholder="Search {{h}}" />
+                placeholder="Search {{display_h}}" />
       </th>
   {%endfor%}
   </tr>
 
   {%for record in lastRecords%}
     <tr>
-      {%for k, v in record.to_dict().items()%}
-        <td class="searchable_{{headers[k]}}">
-        {%if k == "attachment" %}
-          <img style="max-width:300px" src="{{ url_for('static', filename='attachments/' + showingEvent + '/' + v) }}" class="image" />
-        {% else %}
-          {{ v }}
+      {%for k, display_h in headers.items() %}
+        {%if k in record %}
+          <td class="searchable_{{display_h}}">
+            {%if k == "attachment" %}
+              <img 
+                style="max-width:300px" 
+                src="{{ url_for('static', filename='attachments/' + showingEvent + '/' + record[k]) }}" 
+                class="image" 
+                />
+            {% else %}
+              {{ record[k] }}
+            {%endif%}
+          </td>
         {%endif%}
-        </td>
       {%endfor%}
       <td>
         <form method="post">
