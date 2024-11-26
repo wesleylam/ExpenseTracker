@@ -1,10 +1,15 @@
 const amount_header_string = "Amount"
 
 function rateOnChange(event) {
+  fromC = originalCurrency
   toC = event.value
-  rate = yenRate[toC]
+  rate = rates[fromC][toC]
+  console.log(fromC, toC, rate)
   for (let strong of document.getElementsByName("switchableCurrency")) {
     strong.innerHTML = (parseFloat(strong.attributes['value'].value) * rate).toFixed(2);
+  }
+  for (let strong of document.getElementsByName("dynamicRate")) {
+    strong.innerHTML = (parseFloat(strong.attributes['value'].value) * (1/rate)).toFixed(4);
   }
 }
 
@@ -74,4 +79,13 @@ function amount_input_edited()
 {
   document.getElementById("calc_eval_input").value = "";
   document.getElementById("new_amount_label").innerText = amount_header_string;
+}
+
+
+function open_img(td) {
+  const img_elems = td.getElementsByTagName("img");
+  if (img_elems.length > 0)
+  {
+    img_elems[0].src = td.childNodes[0].nodeValue
+  }
 }

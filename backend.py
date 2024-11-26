@@ -2,8 +2,12 @@ from os import listdir, mkdir, remove
 from os.path import isfile, join, isdir, exists
 from datetime import datetime
 import pandas as pd
+import os 
+import re
+import time
 
 allCurrency = ['AUD', 'YEN', 'HKD']
+unifyCurrency = "YEN"
 
 def log(event, r):
     with open("./activity.log", 'a') as f:
@@ -13,7 +17,7 @@ def log(event, r):
 def getHeaders():
     return {k: v for k, v in zip(
         ["reportor","date", "item", "currency", "amount", "target", "attachment", "delete"],
-        ["Reportor", "Date", "Description", "Currency", "Amount", "Payer", "Attachment", "Delete"]
+        ["Reportor", "Date", "Description", "Currency", "Amount", "Payer", "Attachment (CLICK TO OPEN)", "Delete"]
     )}
 
 def parseStore(event):
@@ -25,7 +29,7 @@ def parseStore(event):
     df = pd.read_csv(fname, index_col=0, keep_default_na=False)
     
     # GET FILE INFO
-    info, preferredCurrency = readInfo()
+    info, preferredCurrencies = readInfo()
     if event not in info:
         raise Exception("No event " + event)
     
@@ -46,7 +50,7 @@ def parseStore(event):
         payee = row['reportor']
         currency = row['currency']
         amount = row['amount']
-        amount *= rates[currency]['YEN']
+        amount *= rates[currency][unifyCurrency]
         target: str = row['target']
         
         comb_shared_prefix = "Shared: "
@@ -66,18 +70,10 @@ def parseStore(event):
         else:
             pay[target][payee] = round(pay[target][payee] + amount, 2)
 
-    return pay, payers, lastRecords
+    return pay, payers, lastRecords, preferredCurrencies[event]
 
 def getFullRates(event = None):
     rates = {}
-
-    if event is not None:
-        info, preferredCurrency = readInfo()
-        if event in preferredCurrency:
-            pc = preferredCurrency[event]
-            if pc in allCurrency:
-                # add preferred first
-                rates[pc] = 1
 
     for c in allCurrency:
         rates[c] = getRate(c)
@@ -103,20 +99,17 @@ def deriveRate(fromC, toC, rates):
 
 def getRate(fromCurrency):
     rate = {}
-    with open(join(getSettingPath(), 'rates.csv')) as f:
-        for line in f.readlines():
-            # skip
-            if len(line) == 0 or line[0] == "#":
-                continue
-            
-            tokens = line.split(',')
-            # clean input
-            tokens = [t.strip() for t in tokens]
-            assert len(tokens) == 3, "Incorrect format in rates setting files: " + len(tokens)
-            if tokens[0] == fromCurrency:
-                rate[tokens[1]] = float(tokens[2])
-            elif tokens[1] == fromCurrency:
-                rate[tokens[0]] = 1.0 / float(tokens[2])
+    rates_path = join(getSettingPath(), 'rates.csv')
+    rates_df = pd.read_csv(rates_path, index_col=0)
+
+    for i, row in rates_df.iterrows():
+        tokens = i.split('-')
+        assert len(tokens) == 2, "Incorrect format in rates setting files: " + len(tokens)
+        if tokens[0] == fromCurrency:
+            rate[tokens[1]] = float(row['multiplier'])
+        elif tokens[1] == fromCurrency:
+            rate[tokens[0]] = 1.0 / float(row['multiplier'])
+
     if fromCurrency not in rate:
         rate[fromCurrency] = 1
     return rate
@@ -151,3 +144,34 @@ def readInfo():
                 raise Exception("Invalid currency: " + pc)
             
     return info, preferredCurrency
+
+def updateAllCurrency():
+    rates_path = join(getSettingPath(), 'rates.csv')
+    rates_df = pd.read_csv(rates_path, index_col=0)
+    for c in ["AUD","YEN"]:
+        if time.time() - rates_df.loc[f"{c}-HKD", "lastUpdate"] <= 30:
+            continue
+        rates_df.loc[f"{c}-HKD", "multiplier"] = getCurrency(c)
+        rates_df.loc[f"{c}-HKD", "lastUpdate"] = time.time()
+    rates_df.to_csv(rates_path)
+
+def getCurrency(toHkd):
+    lock_file = "rate_done.lock"
+    os.system(f"curl https://www.google.com/search?q={toHkd}+to+hkd > fresh_rate.txt && touch {lock_file}")
+    
+    while not os.path.exists(lock_file):
+        print("waiting for currency result " + toHkd)
+        time.sleep(0.1)
+
+    new_rate = None
+    with open('fresh_rate.txt', 'r', errors='ignore') as f:
+        for line in f.readlines():
+            found = re.search(">([0-9.]+) Hong Kong Dollar", line)
+            if found:
+                new_rate = float(found.group(1))
+                break
+
+    # remove lock after finish
+    os.remove(lock_file)
+
+    return new_rate

@@ -9,7 +9,8 @@ import pandas as pd
 import time
 import itertools
 
-from backend import log, getStorePath, getActiveEvents, getAttachmentStorePath, parseStore, getFullRates, getHeaders
+from backend import log, getStorePath, getActiveEvents, getAttachmentStorePath, \
+  parseStore, getFullRates, getHeaders, updateAllCurrency, unifyCurrency
 
 app = Flask(__name__)
 Bootstrap(app)
@@ -61,7 +62,7 @@ def actionAdd(event, request):
         rowSeries["attachment"] = ""
         
     rowSeries.name = ms
-    df.at[ms] = rowSeries
+    df.loc[ms] = rowSeries
     if (df.duplicated().any()):
         message = "Error: Duplicated entry, " + csvRow
     
@@ -97,7 +98,7 @@ def showEvent(event, message = ""):
         return index()
 
     # pay: k pay k2 > v amount
-    pay, payers, lastRecords = parseStore(event)
+    pay, payers, lastRecords, preferredCurrency = parseStore(event)
 
     # build dynamic pay details
     payCondensed = []
@@ -108,12 +109,15 @@ def showEvent(event, message = ""):
                 payCondensed.append( (payer,payer2,amount) )
             else:
                 payCondensed.append( (payer2,payer,amount) )
-        
+
+    shareList = [f"Shared: {x}, {y}" for x, y in itertools.combinations(payers, 2)] \
+        + [f"Shared: {x}, {y}, {z}" for x, y, z in itertools.combinations(payers, 3)]
     return render_template(
         'event.html', activeEvents = activeEvents, showingEvent = event, 
         currencies = getFullRates(event), payCondensed = payCondensed, payTable = pay, people = payers, 
-        share_option = [f"Shared: {x}, {y}" for x, y in itertools.combinations(payers, 2)], 
-        message = message, lastRecords = lastRecords, 
+        share_option = shareList, 
+        message = message, lastRecords = lastRecords, hideImg = len(lastRecords) > 10,
+        originalCurrency = unifyCurrency, preferredCurrency = preferredCurrency,
         today = datetime.today().strftime('%Y-%m-%d'), headers = getHeaders())
 
 

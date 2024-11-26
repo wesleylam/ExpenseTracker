@@ -8,11 +8,16 @@
     alert("{{message}}")
   }
 
-  const yenRate = {
-    {% for (toC, rate) in currencies['YEN'].items() %}
-    {{toC}}:{{rate}},
+  const rates = {
+    {% for fromC in currencies %}
+      "{{fromC}}": {
+      {% for (toC, rate) in currencies[fromC].items() %}
+      "{{toC}}":{{rate}},
+      {%endfor%}
+      },
     {%endfor%}
   }
+  let originalCurrency = "{{originalCurrency}}";
 </script>
 <script src="{{url_for('static', filename='js/event.js')}}"></script>
 {% endblock %}
@@ -125,16 +130,27 @@
 <h3>TOTAL PAYABLE: </h3>
 <!-- currency -->
 <label for="currency">Currency</label>
-<select id="display_currency_switch" name="currency" onchange="rateOnChange(this)">
+<select id="display_currency_switch" value="{{preferredCurrency}}" name="currency" onchange="rateOnChange(this)">
   {% for (c, rate) in currencies.items() %}
-  <option value="{{c}}">{{c}}</option>
+  <option value="{{c}}" 
+    {%if c == preferredCurrency %}
+    selected
+    {%endif%}>{{c}}</option>
   {%endfor%}
 </select>
+<br/>
+<!-- RATES -->
+{
+{% for (toC, rate) in currencies[originalCurrency].items() %}
+{{toC}}: <strong name="dynamicRate" value="{{rate}}">{{ rate }}</strong>
+{%endfor%}
+}
 <br/>
 {% for (payer, payee, amount) in payCondensed %}
   {{ payer }} pay {{ payee }}: <strong name="switchableCurrency" value="{{amount}}">{{ amount }}</strong> <br/>
 {%endfor%}
 <br/>
+<!-- PAY TABLE -->
 <table class="table table-hover">  
   <tr>
     <th>Payer \ Receiver</th>
@@ -172,11 +188,16 @@
     <tr>
       {%for k, display_h in headers.items() %}
         {%if k in record %}
-          <td class="searchable_{{display_h}}">
+          <td class="searchable_{{display_h}}" onclick="open_img(this)">
             {%if k == "attachment" and record[k] != "" %}
+              {{ url_for('static', filename='attachments/' + showingEvent + '/' + record[k]) }}
               <img 
                 style="max-width:300px" 
-                src="{{ url_for('static', filename='attachments/' + showingEvent + '/' + record[k]) }}" 
+                {% if hideImg %}
+                  src="" 
+                {% else %}
+                  src="{{ url_for('static', filename='attachments/' + showingEvent + '/' + record[k]) }}"
+                {%endif%}
                 class="image" 
                 />
             {% else %}
@@ -197,7 +218,8 @@
 </table>
 
 <script>
-  rateOnChange(document.getElementById("display_currency_switch"))
+  cur_switch = document.getElementById("display_currency_switch");
+  rateOnChange(cur_switch)
 </script>
 {% endblock %}
 {{ footer }}
