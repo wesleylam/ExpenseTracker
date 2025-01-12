@@ -16,7 +16,7 @@ app = Flask(__name__)
 Bootstrap(app)
 
 # POST
-@app.post('/newEvent')
+@app.post('/')
 def newEvent(data = None):
     if data == None:
         data = request.form
