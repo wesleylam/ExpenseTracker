@@ -8,6 +8,7 @@ import time
 
 allCurrency = ['AUD', 'YEN', 'HKD']
 unifyCurrency = "YEN"
+STORE_PATH = './store'
 
 def log(event, r):
     with open("./activity.log", 'a') as f:
@@ -29,7 +30,7 @@ def parseStore(event):
     df = pd.read_csv(fname, index_col=0, keep_default_na=False)
     
     # GET FILE INFO
-    info, preferredCurrencies = readInfo()
+    info, preferredCurrencies, infoStrs = readInfo()
     if event not in info:
         raise Exception("No event " + event)
     
@@ -70,7 +71,7 @@ def parseStore(event):
         else:
             pay[target][payee] = round(pay[target][payee] + amount, 2)
 
-    return pay, payers, lastRecords, preferredCurrencies[event]
+    return pay, payers, lastRecords, preferredCurrencies[event], infoStrs[event]
 
 def getFullRates(event = None):
     rates = {}
@@ -117,8 +118,13 @@ def getRate(fromCurrency):
 def getSettingPath():
     return '/home/wesley/dev/ExpenseTracker/settings'
 
+def setStorePath(newPath):
+    global STORE_PATH
+    STORE_PATH = newPath
+
 def getStorePath():
-    return '/home/wesley/dev/ExpenseTracker/store'
+    global STORE_PATH
+    return STORE_PATH
 
 def getAttachmentStorePath():
     return '/home/wesley/dev/ExpenseTracker/static/attachments'
@@ -132,10 +138,12 @@ def getActiveEvents():
 
 def readInfo():
     info = {}
+    infoStrs = {}
     preferredCurrency = {}
     with open(join(getStorePath(), 'info.txt')) as f:
         for line in f.readlines():
             tokens = line.split(',')
+            infoStrs[tokens[0]] = line.strip()
             info[tokens[0]] = [t.strip() for t in tokens[2:]]
 
             pc = tokens[1].strip()
@@ -143,13 +151,14 @@ def readInfo():
             if pc not in allCurrency:
                 raise Exception("Invalid currency: " + pc)
             
-    return info, preferredCurrency
+    return info, preferredCurrency, infoStrs
 
 def updateAllCurrency():
     rates_path = join(getSettingPath(), 'rates.csv')
     rates_df = pd.read_csv(rates_path, index_col=0)
     for c in ["AUD","YEN"]:
-        if time.time() - rates_df.loc[f"{c}-HKD", "lastUpdate"] <= 30:
+        # ONLY update every 30 mins
+        if time.time() - rates_df.loc[f"{c}-HKD", "lastUpdate"] <= 1800:
             continue
         rates_df.loc[f"{c}-HKD", "multiplier"] = getCurrency(c)
         rates_df.loc[f"{c}-HKD", "lastUpdate"] = time.time()

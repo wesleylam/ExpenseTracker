@@ -6,6 +6,9 @@
   if ( window.history.replaceState ) {
     window.history.replaceState( null, null, window.location.href );
   }
+  if ("{{message}}".startsWith("Error")) {
+    alert("{{message}}")
+  }
 </script>
 {% endblock %}
 
@@ -28,5 +31,12 @@
         {%endfor%}
       </ul>
     </div>
+    <form method="post" enctype = "multipart/form-data">
+      <input id="new_event_input" type="text" name="infoStr" value="{{currentInfoStr}}"/>
+      <input name="action" type="hidden" value="NEWEVENT">
+      <button type="submit">New</button>
+    </form>
 </nav>
+<h2 color="red">{{message}}</h2>
+<br />
 {% endblock %}

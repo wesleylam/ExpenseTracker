@@ -4,9 +4,6 @@
 {{ super() }}
 <link rel= "stylesheet" type= "text/css" href= "{{ url_for('static',filename='styles/index.css') }}">
 <script>
-  if ("{{message}}".startsWith("Error")) {
-    alert("{{message}}")
-  }
 
   const rates = {
     {% for fromC in currencies %}
@@ -25,8 +22,6 @@
 
 {% block content %}
 {{ super() }}
-<h2 color="red">{{message}}</h2>
-<br />
 <h3>Add new entry: </h3>
 <form method="post" enctype = "multipart/form-data">
    <!-- reporter -->

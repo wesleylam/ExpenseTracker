@@ -4,7 +4,6 @@ function rateOnChange(event) {
   fromC = originalCurrency
   toC = event.value
   rate = rates[fromC][toC]
-  console.log(fromC, toC, rate)
   for (let strong of document.getElementsByName("switchableCurrency")) {
     strong.innerHTML = (parseFloat(strong.attributes['value'].value) * rate).toFixed(2);
   }

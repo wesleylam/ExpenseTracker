@@ -16,10 +16,37 @@ app = Flask(__name__)
 Bootstrap(app)
 
 # POST
+@app.post('/newEvent')
+def newEvent(data = None):
+    if data == None:
+        data = request.form
+    infoStr = data['infoStr']
+    tokens = [t.strip() for t in infoStr.split(',')]
+    event = tokens[0]
+        
+    log("newEvent", request)
+
+    if event in getActiveEvents():
+        return index(message = f"Event \"{event}\" already exist!")
+    
+    infoFname = join(getStorePath(), 'info.txt')
+    with open(infoFname, 'a') as f:
+        f.write(infoStr + '\n')
+    
+    newFname = join(getStorePath(), event + '.csv')
+    with open(newFname, 'w') as f:
+        f.write("hash,reportor,date,item,currency,amount,target,attachment\n")
+
+    return showEvent(event)
+
 @app.post('/<event>')
 def modifyEntry(event):
     data = request.form
     action = data['action']
+
+    ## route to new event 
+    if action == "NEWEVENT":
+        return newEvent(data)
 
     log(event, request)
 
@@ -93,12 +120,13 @@ def actionDel(event, data):
 @app.route('/<event>')
 def showEvent(event, message = ""):
     activeEvents = getActiveEvents()
+    updateAllCurrency()
     
     if event not in activeEvents:
         return index()
 
     # pay: k pay k2 > v amount
-    pay, payers, lastRecords, preferredCurrency = parseStore(event)
+    pay, payers, lastRecords, preferredCurrency, infoStr = parseStore(event)
 
     # build dynamic pay details
     payCondensed = []
@@ -117,22 +145,24 @@ def showEvent(event, message = ""):
         currencies = getFullRates(event), payCondensed = payCondensed, payTable = pay, people = payers, 
         share_option = shareList, 
         message = message, lastRecords = lastRecords, hideImg = len(lastRecords) > 10,
-        originalCurrency = unifyCurrency, preferredCurrency = preferredCurrency,
+        originalCurrency = unifyCurrency, preferredCurrency = preferredCurrency, currentInfoStr = infoStr,
         today = datetime.today().strftime('%Y-%m-%d'), headers = getHeaders())
 
 
 @app.route('/')
-def index():
+def index(message = ''):
     activeEvents = getActiveEvents()
     return render_template('index.html', 
-                           activeEvents = activeEvents)
+                           activeEvents = activeEvents,
+                           message = message)
 
-def runServer():
-    hostName = "0.0.0.0"
-    serverPort = 80
+def runServer(hostName, serverPort):
     serve(app, host=hostName, port=serverPort)
-    # app.run(debug = False, host = hostName, port = serverPort )
+    # HTTPS with SSL
+    # app.run(debug = False, host = hostName, port = serverPort, ssl_context=('cert.pem', 'key.pem') )
 
 
 if __name__ == "__main__":
-    runServer()
+    hostName = "0.0.0.0"
+    serverPort = 80
+    runServer(hostName, serverPort)

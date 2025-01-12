@@ -1,2 +1,4 @@
 store/*.csv
 static/attachments/*
+activity.log
+*.archived
