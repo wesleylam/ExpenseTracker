@@ -1,7 +1,7 @@
 from os import listdir, mkdir, remove
 from os.path import isfile, join, isdir, exists
 from datetime import datetime
-import pandas as pd
+import csv
 import os 
 import re
 import time
@@ -9,6 +9,76 @@ import time
 allCurrency = ['AUD', 'YEN', 'HKD']
 unifyCurrency = "YEN"
 STORE_PATH = './store'
+
+
+def custom_read_csv(file_path):
+    """
+    Reads a CSV file and returns a dictionary where each key is the value of the first column
+    and the value is another dictionary containing the rest of the row's data. Missing values
+    are filled with None.
+    
+    :param file_path: The path to the CSV file
+    :return: A dictionary representing the CSV data
+    """
+    data = {}
+    cols = []
+    with open(file_path, mode='r') as file:
+        reader = csv.DictReader(file)
+        headers = reader.fieldnames  # Get the list of headers from the CSV file
+        
+        for row in reader:
+            # Extract the first column (assuming it's always the first key in the row)
+            cols = list(row.keys())
+            first_column = cols[0]
+            key = row.pop(first_column)
+            
+            # Fill missing values with None
+            complete_row = {header: row.get(header, None) for header in headers if header != first_column}
+            
+            data[key] = complete_row
+    return data, cols
+
+
+def custom_to_csv(data, file_path, first_column_name=''):
+    """
+    Writes a dictionary to a CSV file. The keys of the outer dictionary become the specified first column,
+    and the keys of the inner dictionaries become the remaining columns. Missing values are filled with None.
+    
+    :param data: The dictionary to write to the CSV file
+    :param file_path: The path to the CSV file
+    :param first_column_name: The name of the column to use as the key for the dictionary (default is 'id')
+    """
+    # Determine the headers
+    headers = set()
+    for key, value in data.items():
+        headers.update(value.keys())
+    
+    # Convert headers to a sorted list for consistent ordering
+    headers = sorted(headers)
+    
+    with open(file_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        
+        # Write the header row
+        writer.writerow([first_column_name] + headers)
+        
+        # Write the data rows
+        for key, value in data.items():
+            row = [key] + [value.get(header, None) for header in headers]
+            writer.writerow(row)
+
+def checkDup(entryDict, records):
+    for ms, entryRow in records.items():
+        dup = True
+        for k, v in entryDict.items():
+            if entryRow[k] != v:
+                ## continue if any is not equal
+                dup = False
+                break
+        if dup:
+            return True
+    return False
+        
 
 def log(event, r):
     with open("./activity.log", 'a') as f:
@@ -27,7 +97,7 @@ def parseStore(event):
     lastRecords = []
     
     fname = join(getStorePath(), event + '.csv')
-    df = pd.read_csv(fname, index_col=0, keep_default_na=False)
+    df, cols = custom_read_csv(fname)
     
     # GET FILE INFO
     info, preferredCurrencies, infoStrs = readInfo()
@@ -43,14 +113,15 @@ def parseStore(event):
     rates = getFullRates()
 
     # ITERATE RECORDS
-    for i, row in df.iterrows():
+    for i, row in df.items():
+        row['ms'] = i
         lastRecords.insert(0, row)
         if len(lastRecords) == 100:
             lastRecords.pop()
 
         payee = row['reportor']
         currency = row['currency']
-        amount = row['amount']
+        amount = float(row['amount'])
         amount *= rates[currency][unifyCurrency]
         target: str = row['target']
         
@@ -101,9 +172,9 @@ def deriveRate(fromC, toC, rates):
 def getRate(fromCurrency):
     rate = {}
     rates_path = join(getSettingPath(), 'rates.csv')
-    rates_df = pd.read_csv(rates_path, index_col=0)
+    rates_df, cols = custom_read_csv(rates_path)
 
-    for i, row in rates_df.iterrows():
+    for i, row in rates_df.items():
         tokens = i.split('-')
         assert len(tokens) == 2, "Incorrect format in rates setting files: " + len(tokens)
         if tokens[0] == fromCurrency:
@@ -116,7 +187,7 @@ def getRate(fromCurrency):
     return rate
 
 def getSettingPath():
-    return '/home/wesley/dev/ExpenseTracker/settings'
+    return './settings'
 
 def setStorePath(newPath):
     global STORE_PATH
@@ -127,7 +198,7 @@ def getStorePath():
     return STORE_PATH
 
 def getAttachmentStorePath():
-    return '/home/wesley/dev/ExpenseTracker/static/attachments'
+    return './attachments'
 
 def getActiveEvents():
     storePath = getStorePath()
@@ -155,14 +226,15 @@ def readInfo():
 
 def updateAllCurrency():
     rates_path = join(getSettingPath(), 'rates.csv')
-    rates_df = pd.read_csv(rates_path, index_col=0)
+    rates_df, cols = custom_read_csv(rates_path)
     for c in ["AUD","YEN"]:
         # ONLY update every 30 mins
-        if time.time() - rates_df.loc[f"{c}-HKD", "lastUpdate"] <= 1800:
+        if time.time() - float(rates_df[f"{c}-HKD"]["lastUpdate"]) <= 1800:
             continue
-        rates_df.loc[f"{c}-HKD", "multiplier"] = getCurrency(c)
-        rates_df.loc[f"{c}-HKD", "lastUpdate"] = time.time()
-    rates_df.to_csv(rates_path)
+        rates_df[f"{c}-HKD"]["multiplier"] = getCurrency(c)
+        rates_df[f"{c}-HKD"]["lastUpdate"] = time.time()
+        
+    custom_to_csv(rates_df, rates_path, cols[0])
 
 def getCurrency(toHkd):
     lock_file = "rate_done.lock"
