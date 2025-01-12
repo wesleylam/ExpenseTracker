@@ -241,7 +241,7 @@ def getCurrency(toHkd):
     lock_file = "rate_done.lock"
     os.system(f"touch {lock_file} && curl https://www.google.com/search?q={toHkd}+to+hkd > fresh_rate.txt")
     
-    while not os.path.exists(lock_file):
+    while os.path.exists(lock_file):
         print("waiting for currency result " + toHkd)
         time.sleep(0.1)
 
