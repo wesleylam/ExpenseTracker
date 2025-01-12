@@ -253,7 +253,4 @@ def getCurrency(toHkd):
                 new_rate = float(found.group(1))
                 break
 
-    # remove lock after finish
-    os.remove(lock_file)
-
     return new_rate
