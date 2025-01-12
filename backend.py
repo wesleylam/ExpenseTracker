@@ -229,7 +229,8 @@ def updateAllCurrency():
     rates_df, cols = custom_read_csv(rates_path)
     for c in ["AUD","YEN"]:
         # ONLY update every 30 mins
-        if time.time() - float(rates_df[f"{c}-HKD"]["lastUpdate"]) <= 1800:
+        if rates_df[f"{c}-HKD"]["multiplier"] != "" and \
+            time.time() - float(rates_df[f"{c}-HKD"]["lastUpdate"]) <= 1800:
             continue
         rates_df[f"{c}-HKD"]["multiplier"] = getCurrency(c)
         rates_df[f"{c}-HKD"]["lastUpdate"] = time.time()
