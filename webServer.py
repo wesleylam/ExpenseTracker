@@ -1,7 +1,6 @@
 # from DJDynamoDB import DJDB
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 from flask_bootstrap import Bootstrap
-from waitress import serve
 from os import listdir, mkdir, remove
 from os.path import isfile, join, isdir, exists
 from datetime import datetime
@@ -37,7 +36,7 @@ def newEvent(data = None):
     with open(newFname, 'w') as f:
         f.write("hash,reportor,date,item,currency,amount,target,attachment\n")
 
-    return showEvent(event)
+    return redirect(url_for('showEvent', event=event))
 
 @app.post('/<event>')
 def modifyEntry(event):
@@ -159,7 +158,7 @@ def index(message = ''):
                            message = message)
 
 def runServer(hostName, serverPort):
-    serve(app, host=hostName, port=serverPort)
+    app.run(debug = True, host = hostName, port = serverPort)
     # HTTPS with SSL
     # app.run(debug = False, host = hostName, port = serverPort, ssl_context=('cert.pem', 'key.pem') )
 

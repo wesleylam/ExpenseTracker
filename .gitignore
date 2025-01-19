@@ -3,3 +3,5 @@ static/attachments/*
 logs/activity.log
 logs/*_fresh_rate.txt
 *.archived
+private/
+__pycache__/

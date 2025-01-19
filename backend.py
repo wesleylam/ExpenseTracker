@@ -2,7 +2,7 @@ from os import listdir, mkdir, remove
 from os.path import isfile, join, isdir, exists
 from datetime import datetime
 import csv
-import os 
+import os
 import re
 import time
 
@@ -25,11 +25,11 @@ def custom_read_csv(file_path):
     with open(file_path, mode='r') as file:
         reader = csv.DictReader(file)
         headers = reader.fieldnames  # Get the list of headers from the CSV file
+        cols = headers
+        first_column = cols[0]
         
         for row in reader:
             # Extract the first column (assuming it's always the first key in the row)
-            cols = list(row.keys())
-            first_column = cols[0]
             key = row.pop(first_column)
             
             # Fill missing values with None
