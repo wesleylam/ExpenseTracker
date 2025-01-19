@@ -81,7 +81,7 @@ def checkDup(entryDict, records):
         
 
 def log(event, r):
-    with open("./activity.log", 'a') as f:
+    with open("./logs/activity.log", 'a') as f:
         f.write(f'{datetime.now()}: {event} - {r.environ}\n{r.form}\n')
 
 
@@ -239,16 +239,22 @@ def updateAllCurrency():
 
 def getCurrency(toHkd):
     lock_file = "rate_done.lock"
-    os.system(f"touch {lock_file} && curl https://www.google.com/search?q={toHkd}+to+hkd > fresh_rate.txt && rm {lock_file}")
+    
+    if toHkd.lower() == "yen": toHkd = "jpy"
+    toHkd = toHkd.lower()
+    
+    curl_save_fname = f"./logs/{toHkd}_fresh_rate.txt"
+    os.system(f"touch {lock_file} && curl https://wise.com/au/currency-converter/{toHkd}-to-hkd-rate > {curl_save_fname} && rm {lock_file}")
     
     while os.path.exists(lock_file):
         print("waiting for currency result " + toHkd)
         time.sleep(1)
 
     new_rate = None
-    with open('fresh_rate.txt', 'r', errors='ignore') as f:
+    with open(curl_save_fname, 'r', errors='ignore') as f:
         for line in f.readlines():
-            found = re.search(">([0-9.]+) Hong Kong Dollar", line)
+            # A$1.000 AUD = $<span class="text-success">4.820</span> HKD</span>
+            found = re.search("([.0-9]+)<[/a-z]+> HKD", line)
             if found:
                 new_rate = float(found.group(1))
                 break
