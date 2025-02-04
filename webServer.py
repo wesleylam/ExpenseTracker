@@ -1,22 +1,21 @@
 # from DJDynamoDB import DJDB
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 from flask_bootstrap import Bootstrap
-from waitress import serve
 from os import listdir, mkdir, remove
 from os.path import isfile, join, isdir, exists
 from datetime import datetime
-import pandas as pd
 import time
 import itertools
 
 from backend import log, getStorePath, getActiveEvents, getAttachmentStorePath, \
-  parseStore, getFullRates, getHeaders, updateAllCurrency, unifyCurrency
+  parseStore, getFullRates, getHeaders, updateAllCurrency, unifyCurrency, \
+    custom_read_csv, custom_to_csv, checkDup
 
 app = Flask(__name__)
 Bootstrap(app)
 
 # POST
-@app.post('/newEvent')
+@app.post('/')
 def newEvent(data = None):
     if data == None:
         data = request.form
@@ -37,7 +36,7 @@ def newEvent(data = None):
     with open(newFname, 'w') as f:
         f.write("hash,reportor,date,item,currency,amount,target,attachment\n")
 
-    return showEvent(event)
+    return redirect(url_for('showEvent', event=event))
 
 @app.post('/<event>')
 def modifyEntry(event):
@@ -68,14 +67,22 @@ def actionAdd(event, request):
     message = ""
     # validation
     if csvData[0] == csvData[-1]: # payee == target
-        message = "Error: Payee cannot be the same as target"
+        return "Error: Payee cannot be the same as target"
+
     # prevent resubmit
     fname = join(getStorePath(), event + '.csv')
     
-    df = pd.read_csv(fname, index_col=0, na_filter=False, dtype=str)
+    # Read store
+    df, cols = custom_read_csv(fname)
 
     ms = int(time.time())
-    rowSeries = pd.Series(data)
+    ## new entry init
+    rowSeries = {c: data[c] for c in cols if c in data}
+    
+    ## check dup
+    if checkDup(rowSeries, df):
+        return "Error: Duplicated entry, " + csvRow
+
     # save attachment
     f = request.files['attachment']
     if f.filename != "":
@@ -88,31 +95,25 @@ def actionAdd(event, request):
     else:
         rowSeries["attachment"] = ""
         
-    rowSeries.name = ms
-    df.loc[ms] = rowSeries
-    if (df.duplicated().any()):
-        message = "Error: Duplicated entry, " + csvRow
-    
-    if message == "":
-        df.to_csv(fname)
-
-    return message
+    df[ms] = rowSeries
+    custom_to_csv(df, fname, cols[0])
+    return "" ## no err
     
 def actionDel(event, data):
     message = ""
     fname = join(getStorePath(), event + '.csv')
-    df = pd.read_csv(fname, index_col=0, dtype=str, keep_default_na=False)
+    df, cols = custom_read_csv(fname)
     
-    row = df.loc[int(data["hash"])]
+    row = df[data["ms"]]
     if row["attachment"] != "":
         aPath = join(getAttachmentStorePath(), event, row["attachment"])
         if exists(aPath):
             remove(aPath)
+
+    del df[data["ms"]]
+    custom_to_csv(df, fname, cols[0])
     
-    df = df.drop(int(data["hash"]), axis=0)
-    df.to_csv(fname)
-    
-    message = "Removed " + data["hash"]
+    message = "Removed " + data["ms"]
 
     return message 
 
@@ -157,7 +158,7 @@ def index(message = ''):
                            message = message)
 
 def runServer(hostName, serverPort):
-    serve(app, host=hostName, port=serverPort)
+    app.run(debug = True, host = hostName, port = serverPort)
     # HTTPS with SSL
     # app.run(debug = False, host = hostName, port = serverPort, ssl_context=('cert.pem', 'key.pem') )
 
